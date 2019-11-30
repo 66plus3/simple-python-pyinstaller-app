@@ -1,26 +1,45 @@
-{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf400
-{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
-{\colortbl;\red255\green255\blue255;\red25\green28\blue31;\red249\green249\blue249;\red98\green9\blue1;
-\red251\green0\blue7;\red210\green9\blue5;}
-{\*\expandedcolortbl;;\cssrgb\c12941\c14510\c16078;\cssrgb\c98039\c98039\c98039;\cssrgb\c46667\c6667\c0;
-\cssrgb\c100000\c0\c0\c4706;\cssrgb\c86667\c13333\c0;}
-\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
-\deftab720
-\pard\pardeftab720\partightenfactor0
-
-\f0\fs28 \cf2 \cb3 \expnd0\expndtw0\kerning0
-pipeline \{\
-    agent none \
-    stages \{\
-        stage(\cf4 \cb5 '\cf6 Build\cf4 '\cf2 \cb3 ) \{ \
-            agent \{\
-                docker \{\
-                    image \cf4 \cb5 '\cf6 python:2-alpine\cf4 '\cf2 \cb3  \
-                \}\
-            \}\
-            steps \{\
-                sh \cf4 \cb5 '\cf6 python -m py_compile sources/add2vals.py sources/calc.py\cf4 '\cf2 \cb3  \
-            \}\
-        \}\
-    \}\
-\}}
+pipeline {
+    agent none
+    stages {
+        stage('Build') {
+            agent {
+                docker {
+                    image 'python:2-alpine'
+                }
+            }
+            steps {
+                sh 'python -m py_compile sources/add2vals.py sources/calc.py'
+            }
+        }
+        stage('Test') {
+            agent {
+                docker {
+                    image 'qnib/pytest'
+                }
+            }
+            steps {
+                sh 'py.test --verbose --junit-xml test-reports/results.xml sources/test_calc.py'
+            }
+            post {
+                always {
+                    junit 'test-reports/results.xml'
+                }
+            }
+        }
+        stage('Deliver') {
+            agent {
+                docker {
+                    image 'cdrx/pyinstaller-linux:python2'
+                }
+            }
+            steps {
+                sh 'pyinstaller --onefile sources/add2vals.py'
+            }
+            post {
+                success {
+                    archiveArtifacts 'dist/add2vals'
+                }
+            }
+        }
+    }
+}
